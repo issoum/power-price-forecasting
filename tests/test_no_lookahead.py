@@ -63,3 +63,9 @@ def test_walk_forward_never_trains_on_test_period():
 def test_best_pair_respects_charge_before_discharge():
     assert backtest.best_pair([50, 10, 80, 5], efficiency=1.0) == (1, 2)
     assert backtest.best_pair([90, 80, 70, 60], efficiency=1.0) is None
+
+
+def test_cycle_cost_filters_small_spreads():
+    # forecast spread 0.85 * 20 - 10 = 7 EUR: profitable without cost, skipped with a 10 EUR cycle cost
+    assert backtest.best_pair([10, 20], efficiency=0.85) == (0, 1)
+    assert backtest.best_pair([10, 20], efficiency=0.85, cycle_cost=10) is None

@@ -19,32 +19,51 @@ DM p-value: Diebold–Mariano test that the best model is more accurate (daily-a
 | Naive D-1 | 29.0 | 45.4 | 0.79 | 48.1 % | < 0.001 |
 | Naive D-7 | 36.5 | 55.4 | 1.00 | 54.9 % | < 0.001 |
 
-**Battery arbitrage** (1 MW / 1 MWh, one cycle per day, 85 % round-trip efficiency).
-Capture rate is the P&L as a share of the perfect-foresight P&L (€74.0k, about €40.5k per MW per year).
+**Battery arbitrage** (1 MW / 1 MWh, one cycle per day, 85 % round-trip efficiency, **15 EUR/MWh cycle
+cost** for degradation and fees). Owning a battery earns the structural intraday spread whatever the
+forecast. The value of the forecast itself is therefore measured **in excess of the naive D-7
+forecast**.
 
-| Forecast used | P&L (EUR) | Capture rate | Profitable trades | Worst day (EUR) |
-|---|---:|---:|---:|---:|
-| Ridge | **68,400** | **92.4 %** | 99.1 % | −22 |
-| Gradient boosting | 66,515 | 89.9 % | 98.9 % | −17 |
-| Naive D-1 | 65,537 | 88.6 % | 96.8 % | −49 |
-| Naive D-7 | 63,251 | 85.5 % | 97.4 % | −51 |
+| Forecast used | P&L per MW-year | Excess vs naive D-7 | Excess per MW-year | 95 % CI of total excess* | Losing trades |
+|---|---:|---:|---:|---:|---:|
+| Ridge | €32.0k | **+9.5 %** | **€2,780** | €3.5k – €7.0k | 6.2 % |
+| Gradient boosting | €31.0k | +6.0 % | €1,750 | €1.3k – €5.3k | 6.8 % |
+| Naive D-1 | €30.4k | +4.1 % | €1,190 | – | 10.2 % |
+| Naive D-7 | €29.2k | – | – | – | 9.8 % |
+
+\*Block bootstrap over weeks, 667 days. Perfect foresight earns €35.1k per MW-year.
+The excess value is stable for cycle costs from 0 to 30 EUR/MWh (`reports/cycle_cost_sensitivity_*.csv`).
 
 ![Forecast vs actual, last test week](reports/forecast_week_DE-LU_2025-01-01.png)
-![Cumulative battery P&L](reports/cum_pnl_DE-LU_2025-01-01.png)
+![Battery P&L in excess of the naive forecast](reports/excess_pnl_DE-LU_2025-01-01.png)
 
 ### Takeaways
 
 - Gradient boosting cuts the error of the weekly naive benchmark by **45 %**. An ablation without
   the weather features gives an MAE of 27.0 instead of 20.2, so **weather forecasts alone reduce the
   error by a quarter**. The rest of the gain comes from recent price lags and calendar effects.
+- **Most of the battery P&L is not forecasting skill.** The naive forecast already earns 83 % of
+  the perfect-foresight P&L, because the German daily shape (solar trough at midday, evening peak)
+  is very regular. A better forecast adds about €1.7–2.8k per MW-year (+6 to +10 %), and the
+  bootstrap confidence intervals exclude zero.
 - **The most accurate model is not the most profitable one.** The battery only cares about which
-  hours are the cheapest and the most expensive of the day, not about price levels. Ridge earns
-  2.5 points more capture than gradient boosting, although gradient boosting is more accurate and
-  even ranks the hours slightly better on average (intraday Spearman 0.883 vs 0.875). Accuracy
-  metrics and trading value answer different questions.
-- Even naive forecasts capture 85 % of the perfect-foresight value, because the German daily shape
-  (solar trough at midday, evening peak) is very regular. Forecasting adds the last 5–7 points of
-  capture.
+  hours are the cheapest and the most expensive of the day. Ridge adds more value than gradient
+  boosting although gradient boosting is more accurate and ranks the hours slightly better on
+  average (intraday Spearman 0.883 vs 0.875). Gradient boosting's excess P&L also stalled in summer
+  2026. Accuracy metrics and trading value answer different questions.
+
+## Backtest assumptions and limits
+
+- **Execution:** price-independent orders in the day-ahead auction, filled at the clearing price
+  with no market impact. This is realistic for a small battery.
+- **Costs:** 15 EUR/MWh discharged for degradation and fees. A trade is only placed when the
+  forecast spread covers losses and this cost. Grid charges, auxiliary consumption and outages
+  are ignored.
+- **Conservative on revenue:** one cycle per day on hourly prices. The auction clears 15-minute
+  products since October 2025, and a real battery would also trade intraday and sell balancing
+  services.
+- The P&L figures value the asset's dispatch, not a return on capital: the battery's capex is
+  not modelled.
 
 ## Avoiding look-ahead bias
 
@@ -68,12 +87,6 @@ before gate closure, and walk-forward training data must end before the first te
   wind speed, solar radiation and cloud cover, as forecast one and two days ahead, averaged over six
   German locations (demand centres and a North Sea wind cluster). Complete from March 2024.
 
-## Backtest assumptions
-
-Price-taker in the day-ahead auction (no market impact), one charge hour followed by one discharge
-hour per day, battery empty at the start of each day, efficiency applied on the sell leg, and no
-degradation or grid fees.
-
 ## Code
 
 ```
@@ -82,7 +95,7 @@ src/powerfc/
   features.py    lagged prices, weather, calendar
   models.py      naive benchmarks, ridge, gradient boosting, walk-forward loop
   evaluate.py    MAE / RMSE / rMAE / sMAPE, Diebold–Mariano test
-  backtest.py    battery arbitrage on forecasts, settled on realised prices
+  backtest.py    battery arbitrage on forecasts with cycle costs, settled on realised prices
   plots.py       report figures
 tests/           look-ahead and backtest unit tests
 ```

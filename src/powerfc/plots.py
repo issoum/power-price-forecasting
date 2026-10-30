@@ -38,12 +38,15 @@ def forecast_week(y, fc, path, zone, models=("gbm", "ridge", "naive_d7")):
     plt.close(fig)
 
 
-def cumulative_pnl(pnl, perfect, path, zone):
+def excess_pnl(pnl, path, zone, cycle_cost, benchmark="naive_d7"):
+    """Cumulative P&L in excess of the naive benchmark: the value added by the forecast itself."""
     fig, ax = plt.subplots(figsize=(11, 4.2))
-    ax.plot(perfect.index, perfect.cumsum(), color=INK_2, linewidth=2, linestyle="--", label="perfect foresight")
+    ax.axhline(0, color=INK_2, linewidth=1)
     for m in COLORS:
-        ax.plot(pnl[m].index, pnl[m].cumsum(), color=COLORS[m], linewidth=2, label=m)
-    _style(ax, f"{zone} battery arbitrage – cumulative P&L (1 MW / 1 MWh)", "EUR")
+        if m == benchmark:
+            continue
+        ax.plot(pnl[m].index, (pnl[m] - pnl[benchmark]).cumsum(), color=COLORS[m], linewidth=2, label=m)
+    _style(ax, f"{zone} battery P&L in excess of the naive D-7 forecast (cycle cost {cycle_cost:g} EUR/MWh)", "EUR")
     ax.legend(frameon=False, loc="upper left", labelcolor=INK_2)
     fig.tight_layout()
     fig.savefig(path, dpi=150)
